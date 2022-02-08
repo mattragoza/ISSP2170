@@ -26,7 +26,7 @@ print(f'lambda_MLE = {lambda_mle}')
 
 # plot some poisson distributions
 
-fig, axes = plt.subplots(1, 3, figsize=(fig_w, fig_h))
+fig, axes = plt.subplots(1, 3, figsize=(fig_w, fig_h/2))
 colors = sns.color_palette()
 x_min = 0
 x_max = 14
