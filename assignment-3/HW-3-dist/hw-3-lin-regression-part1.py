@@ -55,7 +55,7 @@ Y_test_pred = model.predict(X_test)
 # The mean squared error on the train and tests set
 MSE_train = mean_squared_error(Y_train, Y_train_pred)
 MSE_test = mean_squared_error(Y_test, Y_test_pred)
+MSE_ratio = MSE_test/MSE_train * 100
 
 print(f'Train MSE: {MSE_train:.2f}')
-print(f'Test MSE:  {MSE_test:.2f}')
-print(f'{(MSE_test-MSE_train)/MSE_train:.3f}')
+print(f'Test MSE:  {MSE_test:.2f} ({MSE_ratio:.2f}%)')

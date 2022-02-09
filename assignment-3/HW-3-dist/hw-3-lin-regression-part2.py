@@ -6,7 +6,7 @@ Created on Thu Feb  3 18:17:41 2022
 @author: milos
 """
 
-# Problem 2. Part 1. Linear regression
+# Problem 2. Part 2. Qudaratic regression
 
 import numpy as np
 import pandas as pd
@@ -14,25 +14,7 @@ import matplotlib.pyplot as plt
 from sklearn import datasets, linear_model, preprocessing
 from sklearn.metrics import mean_squared_error
 
-
-def quadratic_expansion(X):
-    '''
-    Expand data frame of covariates with
-    quadratic and interaction terms.
-
-    Args:
-        X: N x D data frame of covariates.
-    Returns:
-        N x K data frame of expanded covariates,
-            where K = D + D(D + 1)/2.
-    '''
-    N, D = X.shape
-    columns = list(X.columns)
-    for i, col_i in enumerate(columns):
-        for j, col_j in enumerate(columns[i:]):
-            new_col = f'{col_i}_x_{col_j}'
-            X[new_col] = X[col_i] * X[col_j]
-    return X
+from linreg import quadratic_expansion
 
 
 # load the boston housing dataset
@@ -81,7 +63,7 @@ Y_test_pred = model.predict(X_test)
 # The mean squared error on the train and tests set
 MSE_train = mean_squared_error(Y_train, Y_train_pred)
 MSE_test = mean_squared_error(Y_test, Y_test_pred)
+MSE_ratio = MSE_test/MSE_train * 100
 
 print(f'Train MSE: {MSE_train:.2f}')
-print(f'Test MSE:  {MSE_test:.2f}')
-print(f'{(MSE_test-MSE_train)/MSE_train:.3f}')
+print(f'Test MSE:  {MSE_test:.2f} ({MSE_ratio:.2f}%)')

@@ -6,7 +6,7 @@ Created on Thu Feb  3 18:17:41 2022
 @author: milos
 """
 
-# Problem 2. Part 1. Linear regression
+# Problem 2. Part 3. Stochastic gradient descent
 
 import numpy as np
 import pandas as pd
@@ -16,107 +16,38 @@ from sklearn.metrics import mean_squared_error
 
 import seaborn as sns
 sns.set_context('paper')
-true_color = sns.color_palette('Blues', 3)[2]
-pred_colors = sns.color_palette('Greens', 3)
+colors = sns.color_palette()
+
+from linreg import LinearRegression
 
 # plot settings
 dpi = 400
 fig_h = 3
-fig_w = 5
+fig_w = 6.5
 
 def save_plot(plot_file, fig):
 	'''
 	Standardize and save a plot figure.
 	'''
-	for i, ax in enumerate(fig.get_axes()):
-		ax.set_ylim(0, 1000)
-		ax.set_axisbelow(True) # grid lines behind data
-		ax.grid(True, linestyle=':', color='lightgray')
-		ax.legend(frameon=False)
-	sns.despine(fig)
+	axes = fig.get_axes()
+	for i, ax in enumerate(axes):
+		if i < len(axes)//2: # MSE
+			ax.set_ylim(-200, 2000)
+			ax.set_ylabel('MSE')
+			ax.set_axisbelow(True) # grid lines behind data
+			ax.grid(True, linestyle=':', color='lightgray')
+			han1, lab1 = ax.get_legend_handles_labels()
+		else: # alpha
+			ax.set_ylim(-2e-4, 2e-3)
+			ax.set_ylabel(' $\\alpha$', rotation=0)
+			han2, lab2 = ax.get_legend_handles_labels()
+			ax.legend(han1+han2, lab1+lab2)
+			ax.get_legend().get_frame().set_linewidth(0)
+		ax.set_xlabel('Iteration')
+	sns.despine(fig, right=False)
 	fig.tight_layout()
 	print(f'Writing {plot_file}')
 	fig.savefig(plot_file, dpi=dpi, bbox_inches='tight')
-
-
-class LinearRegression(object):
-
-	def __init__(self, ax=None):
-		self.W = None
-		self.ax = ax
-
-	def fit(
-		self, X, Y,
-		shuffle=True,
-		batch=True,
-		n_iters=1000,
-		lr_fn=lambda x: 0.0001,
-		init_fn=lambda x: np.random.normal(0, 1, x)
-	):
-		print('fitting model', flush=True)
-
-		# convert to arrays
-		X = np.array(X)
-		Y = np.array(Y)
-
-		# check data shapes
-		N, D = X.shape
-		assert Y.shape == (N,)
-		Y = Y.reshape(N, 1)
-
-		# add intercept term
-		X = np.concatenate((np.ones((N, 1)), X), axis=1)
-		D += 1
-
-		if shuffle: # randomize data order
-			order = np.random.permutation(N)
-			X = X[order]
-			Y = Y[order]
-
-		# initialize coefficients
-		self.W = init_fn((D, 1))
-		print(X.shape, self.W.shape, Y.shape)
-
-		iters = np.arange(n_iters+1)
-		MSE = np.full(n_iters+1, np.nan)
-		for i in iters:
-
-			if batch: # batch mode
-				if shuffle:
-					order = np.random.permutation(N)
-					X_curr = X[order]
-					Y_curr = Y[order]
-				else:
-					X_curr = X
-					Y_curr = Y
-			else: # online mode
-				j = i%N
-				X_curr = X[j:j+1]
-				Y_curr = Y[j:j+1]
-
-			# compute predictions and error
-			Y_pred = np.matmul(X_curr, self.W)
-			Y_diff = Y_curr - Y_pred
-			MSE[i] = (Y_diff**2).mean()
-			lr = lr_fn(i+1)
-			print(f'Iteration {i}, MSE = {MSE[i]:.2f}, lr = {lr:.6f}')
-
-			if i == n_iters:
-				break
-
-			# compute gradient and update
-			grad_W = -2 * X_curr.T @ Y_diff
-			self.W = self.W - lr * grad_W
-
-		if self.ax:
-			self.ax.plot(iters, MSE)
-
-	def predict(self, X):
-
-		# add intercept term
-		N, D = X.shape
-		X = np.concatenate((np.ones((N, 1)), X), axis=1)
-		return X @ self.W
 
 
 # load the boston housing dataset
@@ -149,17 +80,21 @@ scaler = preprocessing.StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
-# create training plot
-fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-
 # create linear regression model
-model = LinearRegression(ax=ax)
+model = LinearRegression()
+
+# choose hyperparameters
+hparams_def = dict( # defaults
+    shuffle=False,
+    batch=False,
+    n_iters=1000,
+    alpha_fn=lambda i, n_iters: 5e-2/i,
+    init_fn=lambda shape: np.ones(shape),
+)
 
 # train the model using the training set
-model.fit(X_train, Y_train)
-
-ax.set_title(np.random.rand())
-save_plot('training.png', fig)
+print('Fitting default model')
+iters, MSE, alpha = model.fit(X_train, Y_train, **hparams_def)
 
 # print regression coefficients
 print('Coefficients: \n', model.W[:,0])
@@ -171,7 +106,56 @@ Y_test_pred = model.predict(X_test)
 # The mean squared error on the train and tests set
 MSE_train = mean_squared_error(Y_train, Y_train_pred)
 MSE_test = mean_squared_error(Y_test, Y_test_pred)
+MSE_ratio = MSE_test/MSE_train * 100
 
 print(f'Train MSE: {MSE_train:.2f}')
-print(f'Test MSE:  {MSE_test:.2f}')
-print(f'{(MSE_test-MSE_train)/MSE_train:.3f}')
+print(f'Test MSE:  {MSE_test:.2f} ({MSE_ratio:.2f}%)')
+
+# create training plot
+fig, axes = plt.subplots(1, 2, figsize=(fig_w, fig_h))
+ax = axes[0]
+ax.plot(iters, MSE, color=colors[0], label='MSE')
+ax.set_xlim(-100, hparams_def['n_iters']+100)
+
+ax = ax.twinx()
+ax.plot(iters, alpha, color=colors[1], label='$\\alpha$')
+ax.set_title('Default model')
+
+# optimized hyperparameters
+
+hparams_opt = dict( # optimized
+    shuffle=True,
+    batch=True,
+    n_iters=250,
+    alpha_fn=lambda i, n_iters: 4e-4 * 0.5**(i/(n_iters+1)*5).astype(int),
+    init_fn=lambda shape: np.random.normal(0, 1, shape),
+)
+
+# train the model using the training set
+print('Fitting optimized model')
+iters, MSE, alpha = model.fit(X_train, Y_train, **hparams_opt)
+
+# print regression coefficients
+print('Coefficients: \n', model.W[:,0])
+
+# Make predictions on the train and test sets
+Y_train_pred = model.predict(X_train)
+Y_test_pred = model.predict(X_test)
+
+# The mean squared error on the train and tests set
+MSE_train = mean_squared_error(Y_train, Y_train_pred)
+MSE_test = mean_squared_error(Y_test, Y_test_pred)
+MSE_ratio = MSE_test/MSE_train * 100
+
+print(f'Train MSE: {MSE_train:.2f}')
+print(f'Test MSE:  {MSE_test:.2f} ({MSE_ratio:.2f}%)')
+
+ax = axes[1]
+ax.plot(iters, MSE, color=colors[0], label='MSE')
+ax.set_xlim(-25, hparams_opt['n_iters']+25)
+
+ax = ax.twinx()
+ax.plot(iters, alpha, color=colors[1], label='$\\alpha$')
+ax.set_title('Optimized model')
+
+save_plot('training.png', fig)
