@@ -22,6 +22,10 @@ Y = housing.target
 # display data shape, type, and descriptive stats
 pd.set_option('display.max_columns', 10)
 print(type(X), X.shape)
+
+# convert categorical to numeric
+X = X.apply(pd.to_numeric)
+
 print(X.apply(lambda x: x.dtype))
 print(X.describe().transpose())
 

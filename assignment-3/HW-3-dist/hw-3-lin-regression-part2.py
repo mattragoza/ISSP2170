@@ -14,10 +14,26 @@ import matplotlib.pyplot as plt
 from sklearn import datasets, linear_model, preprocessing
 from sklearn.metrics import mean_squared_error
 
+
 def quadratic_expansion(X):
-      print('quadratic_expansion')
-      print(X.shape)
-      return X
+    '''
+    Expand data frame of covariates with
+    quadratic and interaction terms.
+
+    Args:
+        X: N x D data frame of covariates.
+    Returns:
+        N x K data frame of expanded covariates,
+            where K = D + D(D + 1)/2.
+    '''
+    N, D = X.shape
+    columns = list(X.columns)
+    for i, col_i in enumerate(columns):
+        for j, col_j in enumerate(columns[i:]):
+            new_col = f'{col_i}_x_{col_j}'
+            X[new_col] = X[col_i] * X[col_j]
+    return X
+
 
 # load the boston housing dataset
 housing = datasets.fetch_openml(name='boston', version=1)
@@ -27,6 +43,10 @@ Y = housing.target
 # display data shape, type, and descriptive stats
 pd.set_option('display.max_columns', 10)
 print(type(X), X.shape)
+
+# convert categorical to numeric
+X = X.apply(pd.to_numeric)
+
 print(X.apply(lambda x: x.dtype))
 print(X.describe().transpose())
 
@@ -36,7 +56,8 @@ print(Y.describe().transpose())
 
 # add quadratic terms
 X = quadratic_expansion(X)
-exit()
+print(list(X.columns))
+print(X.shape)
 
 # train/test split
 X_train = X[:-100]
