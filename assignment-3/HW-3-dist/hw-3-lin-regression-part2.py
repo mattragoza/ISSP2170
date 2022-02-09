@@ -14,6 +14,11 @@ import matplotlib.pyplot as plt
 from sklearn import datasets, linear_model, preprocessing
 from sklearn.metrics import mean_squared_error
 
+def quadratic_expansion(X):
+      print('quadratic_expansion')
+      print(X.shape)
+      return X
+
 # load the boston housing dataset
 housing = datasets.fetch_openml(name='boston', version=1)
 X = housing.data
@@ -28,6 +33,10 @@ print(X.describe().transpose())
 print()
 print(type(Y), Y.shape)
 print(Y.describe().transpose())
+
+# add quadratic terms
+X = quadratic_expansion(X)
+exit()
 
 # train/test split
 X_train = X[:-100]
