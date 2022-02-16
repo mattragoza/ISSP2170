@@ -55,6 +55,7 @@ def evaluate_classifier(X, Y, model):
 
 	accuracy = accuracy_score(Y, Yhat)
 	print(f'Accuracy: {accuracy:.2f}')
+	print(f'Misclassification error: {1-accuracy:.2f}')
 
 	conf_matrix = confusion_matrix(Y, Yhat)
 	print(f'Confusion matrix:\n{conf_matrix}')
