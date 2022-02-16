@@ -3,9 +3,26 @@ from scipy import stats
 
 
 class RandomVariable(object):
-    
+    '''
+    A random variable from some family
+    of probability distributions that
+    can be fit to data using MLE.
+    '''
     @classmethod
     def create(cls, rv_type):
+        '''
+        Factory method for creating random
+        variables by type of distribution.
+
+        Args:
+            rv_type:
+                B = Bernoulli distribution
+                N = Normal distribution
+                E = Exponential distribution
+        Returns
+            A new RandomVariable that follows
+                the specified distribution.
+        '''
         rv_type = rv_type.upper()
         if rv_type == 'B':
             return BernoulliVariable()
@@ -14,24 +31,40 @@ class RandomVariable(object):
         elif rv_type == 'E':
             return ExponentialVariable()
         else:
-            raise ValueError(f'unknown random variable type: {rv_type}')
+            raise ValueError(
+                f'unknown distribution: {rv_type} (try "B", "N", or "E")'
+            )
 
     def fit(self, X):
         '''
         Estimate variable parameters
         that maximize likelihood of X.
+
+        Args:
+            X: N vector of values.
+        Returns:
+            None.
         '''
         raise NotImplementedError
 
     def predict(self, X):
         '''
         Probability density at X.
+
+        Args:
+            X: N vector of values.
+        Returns:
+            N vector of probability
+                density values at X.
         '''
         raise NotImplementedError
 
 
 class BernoulliVariable(RandomVariable):
-    
+    '''
+    A random variable that follows
+    a Bernoulli distribution.
+    '''
     def __init__(self, theta=0.5):
         assert 0 <= theta <= 1.0
         self.theta = theta
@@ -49,7 +82,10 @@ class BernoulliVariable(RandomVariable):
 
 
 class NormalVariable(RandomVariable):
-    
+    '''
+    A random variable that follows
+    a univariate normal distribution.
+    '''
     def __init__(self, mu=0.0, sigma=1.0):
         assert sigma > 0
         self.mu = mu
@@ -69,7 +105,10 @@ class NormalVariable(RandomVariable):
 
 
 class ExponentialVariable(RandomVariable):
-    
+    '''
+    A random variable that follows
+    an exponential distribution.
+    '''    
     def __init__(self, mu=1.0):
         assert mu > 0
         self.mu = mu
@@ -87,16 +126,21 @@ class ExponentialVariable(RandomVariable):
 
 
 class NaiveBayes(object):
-
+    '''
+    A Naive Bayes classifier.
+    '''
     def __init__(self, p_X, p_Y):
         '''
-        Specify family of probability distributions
-        for the conditional and prior densities.
+        Initialize the model by specifying families
+        of probability distributions that conditional
+        and prior densities should follow.
 
         Args:
-            p_X: Conditional density families.
+            p_X: List of conditional density families.
             p_Y: Prior density family.
         '''
+        assert p_Y.upper() == 'B', 'only Bernoulli prior is supported'
+
         # initialize conditional densities
         #   p_X[i][j] = p(X_i|Y=j)
         self.p_X = [
@@ -108,6 +152,15 @@ class NaiveBayes(object):
         self.p_Y = RandomVariable.create(p_Y)
 
     def fit(self, X, Y):
+        '''
+        Estimate model parmaters by MLE.
+
+        Args:
+            X: N x D matrix of attribute values.
+            Y: N vector of class values.
+        Returns:
+            None.
+        '''
         N, D = X.shape
         assert Y.shape == (N,)
         assert D == len(self.p_X)
@@ -123,6 +176,14 @@ class NaiveBayes(object):
             print(f'{i}\n\t{self.p_X[i][0]}\n\t{self.p_X[i][1]}')
 
     def predict_proba(self, X):
+        '''
+        Predict class posterior distribution.
+
+        Args:
+            X: N x D matrix of attribute values.
+        Returns:
+            N x 2 matrix of class probabilities.
+        '''
         N, D = X.shape
         assert D == len(self.p_X)
 
@@ -160,6 +221,14 @@ class NaiveBayes(object):
         return np.stack([p_Y0_X, p_Y1_X], axis=1)
 
     def predict(self, X):
+        '''
+        Predict classes for given data.
+
+        Args:
+            X: N x D matrix of attribute values.
+        Returns:
+            N vector of class predictions.
+        '''
         # predict class as argmax of posterior
         p_Y_X = self.predict_proba(X)
         return np.argmax(p_Y_X, axis=1)
