@@ -13,8 +13,13 @@ import seaborn as sns
 sns.set_context('paper')
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve, confusion_matrix
-from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import (
+	accuracy_score,
+	confusion_matrix,
+	roc_auc_score,
+	roc_curve,
+	precision_recall_curve
+)
 
 # load training and test data sets
 
@@ -36,8 +41,6 @@ X_test = df_test.values[:,0:8]
 Y_test = df_test.values[:,8]
 print(X_test.shape, Y_test.shape)
 
-targets = ['class 0', 'class 1']
-
 # model training
 
 print('\nFitting logistic regression model')
@@ -50,7 +53,7 @@ def evaluate_classifier(X, Y, model):
 
 	Yhat = model.predict(X)
 
-	accuracy = model.score(X, Y)
+	accuracy = accuracy_score(Y, Yhat)
 	print(f'Accuracy: {accuracy:.2f}')
 
 	conf_matrix = confusion_matrix(Y, Yhat)
@@ -61,7 +64,7 @@ def evaluate_classifier(X, Y, model):
 
 	# compute sensitivity, specificity, precision, NPV
 	print(f'TPR: {tp/(tp+fn):.2f} (aka sensitivity, recall)')
-	print(f'TNR: {tn/(tn+fp):.2f} (aka specificity')
+	print(f'TNR: {tn/(tn+fp):.2f} (aka specificity)')
 	print(f'PPV: {tp/(tp+fp):.2f} (aka precision)')
 	print(f'NPV: {tn/(tn+fn):.2f}')
 
