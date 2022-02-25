@@ -21,15 +21,21 @@ print('Configuring run')
 def int_tuple(s):
 	return tuple(int(x) for x in s.split('-'))
 
+def get_activ(a):
+	return dict(l='logistic', t='tanh', r='relu')[a]
+
+def get_lr(l):
+	return dict(c='constant', i='invscaling', a='adaptive')[l]
+
 # command line args
 parser = argparse.ArgumentParser()
 parser.add_argument('-n', '--name', default='mlp')
-parser.add_argument('-H', '--hidden_layers', default=(4,), type=int_tuple)
-parser.add_argument('-A', '--activation', default='logistic')
+parser.add_argument('-H', '--hidden_layers', default='4', type=int_tuple)
+parser.add_argument('-A', '--activation', default='l', type=get_activ)
 parser.add_argument('-s', '--solver', default='adam')
-parser.add_argument('-a', '--alpha', default=0.001)
-parser.add_argument('-l', '--learning_rate', default='constant')
-parser.add_argument('-i', '--learning_rate_init', default=0.001)
+parser.add_argument('-a', '--alpha', default=1e-4)
+parser.add_argument('-l', '--learning_rate', default='c', type=get_lr)
+parser.add_argument('-i', '--learning_rate_init', default=1e-3)
 parser.add_argument('-m', '--max_iter', default=1000)
 parser.add_argument('-b', '--batch_size', default=64)
 parser.add_argument('-r', '--random_state', default=None)
