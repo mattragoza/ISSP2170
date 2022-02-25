@@ -6,7 +6,7 @@ Created on Thu Feb 10 18:02:35 2022
 @author: milos
 """
 
-import sys, argparse
+import sys, os, argparse
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -78,13 +78,13 @@ print('\nTest evaluations')
 yh_test, pr_test = evaluate_classifier(X_test, y_test, model)
 
 plot_classifier(
-	f'{args.out_dir}/plots/{args.name}_evals.png',
+	f'{args.out_dir}/{args.name}_evals.png',
 	y_train, yh_train, pr_train,
 	y_test,  yh_test,  pr_test
 )
 
 write_classifier(
-	f'{args.out_dir}/metrics/{args.name}_evals.csv',
+	f'{args.out_dir}/{args.name}_evals.csv',
 	['train']*len(y_train) + ['test'] * len(y_test),
 	list(y_train)  + list(y_test),
 	list(yh_train) + list(yh_test),
