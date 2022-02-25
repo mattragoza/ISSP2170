@@ -35,7 +35,7 @@ print_config(args)
 
 print('\nLoading training set')
 
-df_train = pd.read_csv('pima_train.csv')
+df_train = pd.read_csv(os.path.join(args.data_dir, 'pima_train.csv'))
 print(df_train.head())
 
 X_train = df_train.values[:,0:8]
@@ -44,7 +44,7 @@ print(X_train.shape, y_train.shape)
 
 print('\nLoading test set')
 
-df_test = pd.read_csv('pima_test.csv')
+df_test = pd.read_csv(os.path.join(args.data_dir, 'pima_test.csv'))
 print(df_test.head())
 
 X_test = df_test.values[:,0:8]
