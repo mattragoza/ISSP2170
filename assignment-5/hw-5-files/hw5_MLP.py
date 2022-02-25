@@ -6,7 +6,7 @@ Created on Thu Feb 10 18:02:35 2022
 @author: milos
 """
 
-import sys, argparse
+import sys, os, argparse
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -40,6 +40,7 @@ parser.add_argument('-m', '--max_iter', default=1000)
 parser.add_argument('-b', '--batch_size', default=64)
 parser.add_argument('-r', '--random_state', default=None)
 parser.add_argument('-v', '--verbose', default=True, action='store_true')
+parser.add_argument('-d', '--data_dir', default='.')
 
 args = parser.parse_args()
 print_config(args)
@@ -48,7 +49,7 @@ print_config(args)
 
 print('\nLoading training set')
 
-df_train = pd.read_csv('pima_train.csv')
+df_train = pd.read_csv(os.path.join(args.data_dir, 'pima_train.csv'))
 print(df_train.head())
 
 X_train = df_train.values[:,0:8]
@@ -57,7 +58,7 @@ print(X_train.shape, y_train.shape)
 
 print('\nLoading test set')
 
-df_test = pd.read_csv('pima_test.csv')
+df_test = pd.read_csv(os.path.join(args.data_dir, 'pima_test.csv'))
 print(df_test.head())
 
 X_test = df_test.values[:,0:8]
