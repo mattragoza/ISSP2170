@@ -23,9 +23,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-n', '--name', default='svm')
 parser.add_argument('-t', '--type', default='SVC')
 parser.add_argument('-k', '--kernel', default='linear')
-parser.add_argument('-d', '--degree', default=1, type=int)
+parser.add_argument('-D', '--degree', default=1, type=int)
 parser.add_argument('-v', '--nu', default=0.5, type=float)
 parser.add_argument('-c', '--C', default=1.0, type=float)
+parser.add_argument('-d', '--data_dir', default='.')
+parser.add_argument('-o', '--out_dir', default='.')
 args = parser.parse_args()
 print_config(args)
 
@@ -76,13 +78,13 @@ print('\nTest evaluations')
 yh_test, pr_test = evaluate_classifier(X_test, y_test, model)
 
 plot_classifier(
-	f'plots/{args.name}_evals.png',
+	f'{args.out_dir}/plots/{args.name}_evals.png',
 	y_train, yh_train, pr_train,
 	y_test,  yh_test,  pr_test
 )
 
 write_classifier(
-	f'metrics/{args.name}_evals.csv',
+	f'{args.out_dir}/metrics/{args.name}_evals.csv',
 	['train']*len(y_train) + ['test'] * len(y_test),
 	list(y_train)  + list(y_test),
 	list(yh_train) + list(yh_test),
