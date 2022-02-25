@@ -41,6 +41,7 @@ parser.add_argument('-b', '--batch_size', default=64, type=int)
 parser.add_argument('-r', '--random_state', default=None, type=int)
 parser.add_argument('-v', '--verbose', default=True, action='store_true')
 parser.add_argument('-d', '--data_dir', default='.')
+parser.add_argument('-o', '--out_dir', default='.')
 
 args = parser.parse_args()
 print_config(args)
@@ -99,13 +100,13 @@ print('\nTest evaluations')
 yh_test, pr_test = evaluate_classifier(X_test, y_test, model)
 
 plot_classifier(
-	f'plots/{args.name}_evals.png',
+	f'{args.out_dir}/plots/{args.name}_evals.png',
 	y_train, yh_train, pr_train,
 	y_test,  yh_test,  pr_test
 )
 
 write_classifier(
-	f'metrics/{args.name}_evals.csv',
+	f'{args.out_dir}/metrics/{args.name}_evals.csv',
 	['train']*len(y_train) + ['test'] * len(y_test),
 	list(y_train)  + list(y_test),
 	list(yh_train) + list(yh_test),
