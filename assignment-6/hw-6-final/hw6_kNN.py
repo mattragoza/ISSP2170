@@ -29,7 +29,7 @@ def get_lr(l):
 
 # command line args
 parser = argparse.ArgumentParser()
-parser.add_argument('-n', '--name', default='dt')
+parser.add_argument('-n', '--name', default='knn')
 parser.add_argument('-k', '--n_neighbors', default=5, type=int)
 parser.add_argument('-w', '--weights', default='uniform')
 parser.add_argument('-d', '--data_dir', default='.')

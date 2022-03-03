@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier, plot_tree
-import matplotlib.pyplot as plt
 
 from classify import (
 	print_config, evaluate_classifier, plot_classifier, write_classifier
