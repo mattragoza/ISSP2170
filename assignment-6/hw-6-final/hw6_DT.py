@@ -10,7 +10,8 @@ import sys, os, argparse
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+import matplotlib.pyplot as plt
 
 from classify import (
 	print_config, evaluate_classifier, plot_classifier, write_classifier
@@ -78,6 +79,8 @@ model = DecisionTreeClassifier(
 	random_state=args.random_state
 )
 model.fit(X_train, y_train)
+
+print(f'Node count = {model.tree_.node_count}')
 
 # model evaluation
 
