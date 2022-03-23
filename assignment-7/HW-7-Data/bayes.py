@@ -73,8 +73,8 @@ class BernoulliVariable(RandomVariable):
         assert set(X.flatten()) <= {0, 1}
         self.theta = np.mean(X)
 
-    def predict(self, X):
-        assert set(X.flatten()) <= {0, 1}
+    def predict(self, X, allow_missing=False):
+        assert set(X[~np.isnan(X)].flatten()) <= {0, 1}
         return self.theta**X * (1-self.theta)**(1-X)
 
     def __repr__(self):
@@ -153,7 +153,7 @@ class NaiveBayes(object):
 
     def fit(self, X, Y):
         '''
-        Estimate model parmaters by MLE.
+        Estimate model parameters by MLE.
 
         Args:
             X: N x D matrix of attribute values.
@@ -203,6 +203,10 @@ class NaiveBayes(object):
         for i in range(D):
             p_X_Y0[:,i] = self.p_X[i][0].predict(X[:,i])
             p_X_Y1[:,i] = self.p_X[i][1].predict(X[:,i])
+
+        # handle missing values by marginalization
+        p_X_Y0 = np.where(np.isnan(X), 1.0, p_X_Y0)
+        p_X_Y1 = np.where(np.isnan(X), 1.0, p_X_Y1)
 
         # joint probabilities
         #   p_XY0 = p(X,Y=0)
