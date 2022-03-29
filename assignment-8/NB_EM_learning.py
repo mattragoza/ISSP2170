@@ -13,18 +13,20 @@ print(f'Loading training set from {data_file}')
 
 data = pd.read_csv(data_file)
 print(data)
+print(data.describe().T)
 
 X = data.values
-print(X.shape, data.columns)
-
+print(X.shape)
 
 # model training
 
 print('\nFitting naive Bayes model')
-model = bayes.NaiveBayes(p_X='CCCCCC', p_Y='C')
-model.fit(X)
+model = bayes.NaiveBayes(p_X=[5,3,3,4,5,4], p_Y=4)
+print(model)
 
 exit()
+model.fit(X)
+
 print(f'\nSaving model to {model_file}')
 
 with open(model_file, 'wb') as f:

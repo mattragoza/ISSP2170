@@ -23,14 +23,17 @@ class RandomVariable(object):
             A new RandomVariable that follows
                 the specified distribution.
         '''
-        rv_type = rv_type.upper()
+        if isinstance(rv_type, str):
+            rv_type = rv_type.upper()
         if rv_type == 'B':
             return BernoulliVariable()
         elif rv_type == 'N':
             return NormalVariable()
         elif rv_type == 'E':
             return ExponentialVariable()
-        else:
+        try:
+            return CategoricalVariable(k=int(rv_type))
+        except:
             raise ValueError(
                 f'unknown distribution: {rv_type} (try "B", "N", or "E")'
             )
@@ -60,7 +63,21 @@ class RandomVariable(object):
         raise NotImplementedError
 
 
-class BernoulliVariable(RandomVariable):
+class DiscreteVariable(RandomVariable):
+
+    @property
+    def support(self):
+        return NotImplemented
+
+
+class ContinuousVariable(RandomVariable):
+
+    @property
+    def support(self):
+        raise ValueError('cannot enumerate support of continuous variable')
+
+
+class BernoulliVariable(DiscreteVariable):
     '''
     A random variable that follows
     a Bernoulli distribution.
@@ -69,19 +86,58 @@ class BernoulliVariable(RandomVariable):
         assert 0 <= theta <= 1.0
         self.theta = theta
 
+    @property
+    def support(self):
+        return {0, 1}
+
     def fit(self, X):
-        assert set(X.flatten()) <= {0, 1}
+        assert set(X.flatten()) <= self.support
         self.theta = np.mean(X)
 
-    def predict(self, X, allow_missing=False):
-        assert set(X[~np.isnan(X)].flatten()) <= {0, 1}
+    def predict(self, X):
+        assert set(X[~np.isnan(X)].flatten()) <= self.support
         return self.theta**X * (1-self.theta)**(1-X)
 
     def __repr__(self):
         return f'B(theta={self.theta:.2f})'
 
 
-class NormalVariable(RandomVariable):
+class CategoricalVariable(DiscreteVariable):
+    '''
+    A random variable that follows
+    a Categorical distribution.
+    '''
+    def __init__(self, k, theta=None):
+
+        if theta is None:
+            theta = np.full(k, 1/k)
+        else:
+            theta = np.array(theta)
+
+        assert len(theta) == k
+        assert all(theta >= 0.0)
+        assert sum(theta) == 1.0
+
+        self.k = k
+        self.theta = theta
+
+    @property
+    def support(self):
+        return {i for i in range(self.k)}
+
+    def fit(self, X):
+        assert set(X.flatten()) <= self.support
+        self.theta = np.eye(self.k)[X].mean(axis=0)
+
+    def predict(self, X):
+        assert set(X[~np.isnan(X)].flatten()) <= self.support
+        return self.theta[X]
+
+    def __repr__(self):
+        return f'C(k={self.k}, theta={self.theta})'
+
+
+class NormalVariable(ContinuousVariable):
     '''
     A random variable that follows
     a univariate normal distribution.
@@ -104,7 +160,7 @@ class NormalVariable(RandomVariable):
         return f'N(mu={self.mu:.2f}, sigma={self.sigma:.2f})'
 
 
-class ExponentialVariable(RandomVariable):
+class ExponentialVariable(ContinuousVariable):
     '''
     A random variable that follows
     an exponential distribution.
@@ -139,17 +195,23 @@ class NaiveBayes(object):
             p_X: List of conditional density families.
             p_Y: Prior density family.
         '''
-        assert p_Y.upper() == 'B', 'only Bernoulli prior is supported'
+        # initialize prior density
+        #   p_Y = p(Y)
+        self.p_Y = RandomVariable.create(p_Y)
 
         # initialize conditional densities
         #   p_X[i][j] = p(X_i|Y=j)
         self.p_X = [
-            [RandomVariable.create(x) for y in range(2)] for x in p_X
+            [RandomVariable.create(x) for y in self.p_Y.support] for x in p_X
         ]
 
-        # initialize prior density
-        #   p_Y = p(Y)
-        self.p_Y = RandomVariable.create(p_Y)
+    def __str__(self):
+        s = str(self.p_Y) + '\n'
+        for i in range(len(self.p_X)):
+            s += str(i) + '\n'
+            for j in self.p_Y.support:
+                s += '\t' + str(self.p_X[i][j]) + '\n'
+        return s
 
     def fit(self, X, Y):
         '''
@@ -167,13 +229,11 @@ class NaiveBayes(object):
 
         # estimate prior parameters
         self.p_Y.fit(Y)
-        print(self.p_Y)
 
         # estimate conditional parameters
         for i in range(D):
             self.p_X[i][0].fit(X[Y==0,i])
             self.p_X[i][1].fit(X[Y==1,i])
-            print(f'{i}\n\t{self.p_X[i][0]}\n\t{self.p_X[i][1]}')
 
     def predict_proba(self, X):
         '''
