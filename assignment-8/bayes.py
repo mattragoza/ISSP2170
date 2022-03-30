@@ -69,6 +69,15 @@ class DiscreteVariable(RandomVariable):
     def support(self):
         return NotImplemented
 
+    def get_dummy(self, X, nan=np.nan):
+        assert X.ndim == 1
+        missing = np.isnan(X)
+        k = len(self.support)
+        nax = np.newaxis
+        X = (X[:,nax] == np.arange(k)[nax,:]).astype(float)
+        X[missing] = nan
+        return X
+
 
 class ContinuousVariable(RandomVariable):
 
@@ -82,8 +91,10 @@ class BernoulliVariable(DiscreteVariable):
     A random variable that follows
     a Bernoulli distribution.
     '''
-    def __init__(self, theta=0.5):
-        assert 0 <= theta <= 1.0
+    def __init__(self, theta=None):
+        if theta is None:
+            theta = np.random.uniform(0, 1)
+        assert 0 <= theta <= 1
         self.theta = theta
 
     @property
@@ -91,11 +102,20 @@ class BernoulliVariable(DiscreteVariable):
         return {0, 1}
 
     def fit(self, X):
-        assert set(X.flatten()) <= self.support
-        self.theta = np.mean(X)
+        assert X.ndim in {1, 2}
+        if X.ndim == 1:
+            assert set(X) <= self.support
+            self.theta = np.mean(X)
+        elif X.ndim == 2:
+            assert X.shape[1] == 2
+            assert (X >= 0).all()
+            assert np.allclose(X.sum(axis=1), 1.0)
+            self.theta = np.mean(X, axis=0)[1]
 
     def predict(self, X):
-        assert set(X[~np.isnan(X)].flatten()) <= self.support
+        assert X.ndim == 1
+        missing = np.isnan(X)
+        assert set(X[~missing]) <= self.support
         return self.theta**X * (1-self.theta)**(1-X)
 
     def __repr__(self):
@@ -110,13 +130,14 @@ class CategoricalVariable(DiscreteVariable):
     def __init__(self, k, theta=None):
 
         if theta is None:
-            theta = np.full(k, 1/k)
+            theta = np.random.dirichlet(np.ones(k))
         else:
             theta = np.array(theta)
 
+        assert theta.ndim == 1
         assert len(theta) == k
         assert all(theta >= 0.0)
-        assert sum(theta) == 1.0
+        assert np.isclose(sum(theta), 1.0)
 
         self.k = k
         self.theta = theta
@@ -125,13 +146,25 @@ class CategoricalVariable(DiscreteVariable):
     def support(self):
         return {i for i in range(self.k)}
 
-    def fit(self, X):
-        assert set(X.flatten()) <= self.support
-        self.theta = np.eye(self.k)[X].mean(axis=0)
+    def fit(self, X, weights=None):
+        assert X.ndim in {1, 2}
+        if X.ndim == 1:
+            assert set(X) <= self.support
+            self.theta = np.average(np.eye(self.k)[X], axis=0, weights=weights)
+        elif X.ndim == 2:
+            assert X.shape[1] == self.k
+            assert (X >= 0.0).all()
+            assert np.allclose(X.sum(axis=1), 1.0)
+            self.theta = np.average(X, axis=0, weights=weights)
 
     def predict(self, X):
-        assert set(X[~np.isnan(X)].flatten()) <= self.support
-        return self.theta[X]
+        assert X.ndim == 1
+        missing = np.isnan(X)
+        assert set(X[~missing]) <= self.support
+        X_ind = self.get_dummy(X)
+        X_ind[missing,:] = np.nan
+        nax = np.newaxis
+        return np.prod(self.theta[nax,:]**X_ind, axis=1)
 
     def __repr__(self):
         return f'C(k={self.k}, theta={self.theta})'
@@ -195,94 +228,187 @@ class NaiveBayes(object):
             p_X: List of conditional density families.
             p_Y: Prior density family.
         '''
-        # initialize prior density
+        # initialize prior distribution
         #   p_Y = p(Y)
         self.p_Y = RandomVariable.create(p_Y)
+        self.K = len(self.p_Y.support)
 
-        # initialize conditional densities
-        #   p_X[i][j] = p(X_i|Y=j)
+        # initialize conditional distributions
+        #   p_X[j][k] = p(X_k|Y=j)
         self.p_X = [
-            [RandomVariable.create(x) for y in self.p_Y.support] for x in p_X
+            [RandomVariable.create(x) for x in p_X] for y in self.p_Y.support
         ]
+        self.D = len(p_X)
 
     def __str__(self):
         s = str(self.p_Y) + '\n'
-        for i in range(len(self.p_X)):
-            s += str(i) + '\n'
-            for j in self.p_Y.support:
-                s += '\t' + str(self.p_X[i][j]) + '\n'
+        for j in self.p_Y.support:
+            s += str(j) + '\n'
+            for k in range(self.D):
+                s += '\t' + str(self.p_X[j][k]) + '\n'
         return s
 
-    def fit(self, X, Y):
+    def fit(self, X, Y=None, max_iter=1000, eps=1e-4):
         '''
-        Estimate model parameters by MLE.
+        Estimate model parameters by MLE or EM.
 
         Args:
             X: N x D matrix of attribute values.
-            Y: N vector of class values.
-        Returns:
-            None.
+            Y: N vector of class values. If not provided,
+                assume that class is latent and use EM.
         '''
         N, D = X.shape
-        assert Y.shape == (N,)
-        assert D == len(self.p_X)
+        assert D == self.D
+        K = self.K
 
-        # estimate prior parameters
+        if Y is None:
+            Y = np.full(N, np.nan)
+
+        assert Y.shape == (N,)
+        Y_missing = np.isnan(Y)
+        Y = self.p_Y.get_dummy(Y)
+
+        # use EM algorithm
+        nax = np.newaxis
+        ll = np.nan
+        for i in range(max_iter):
+            ll_prev = ll
+            ll = 0
+
+            # E-step: replace missing with expected values
+            # p_Y_X[i,j] = p(Y=j|X=x_i) = π_j
+            p_Y = self.class_prior_prob()
+            p_Y_X = self.class_posterior_prob(X, nan=1.0)
+            Y[Y_missing] = p_Y_X[Y_missing]
+            ll += (Y * np.log(p_Y[nax,:])).sum()
+
+            # E-step: update maximum likelihood estimates
+            self.p_Y.fit(p_Y_X)
+
+            # p_X_Y[d,j,k] = p(X_k=d|Y=j) = θ_kjd
+            p_X_Y = self.class_conditional_prob()
+
+            for j in range(K): # class index
+                Y_j = Y[:,j]
+
+                for k in range(D): # attribute index
+
+                    # E-step: replace missing with expected values
+                    p_X = self.p_X[j][k]
+                    d_k = len(p_X.support)
+                    X_k = p_X.get_dummy(X[:,k])
+                    X_k_missing = np.isnan(X[:,k])
+                    X_k[X_k_missing] = p_X_Y[nax,:d_k,j,k]
+
+                    # M-step: update maximum likelihood estimates
+                    self.p_X[j][k].fit(X_k, weights=Y_j+eps)
+
+                    # p_X_Y[d,j,k] = p(X_k=d|Y=j) = θ_kjd
+                    # X_k[i,d] = P(X_k=d|Y=j,θ) if missing, else one hot
+                    # Y[i,j] * X_k[i,d] = P(X_k=d,Y=j|X=x_i,θ)
+                    ll += (Y_j[:,nax] * X_k * np.log(p_X_Y[nax,:d_k,j,k])).sum()
+
+            if np.isnan(ll):
+                print(self)
+            assert not np.isnan(ll)
+
+            delta_ll = ll - ll_prev
+            print(f'[Iteration {i+1}] ll = {ll:.4f} ({delta_ll:.4f})')
+            if abs(delta_ll) < eps:
+                break
+
+    def mle_estimate(self, X, Y):
+        '''
+        Estimate model parameters that
+        maximize likelihood of data.
+        '''
+        N, D = X.shape
+        assert D == self.D
+        assert Y.shape == (N,)
+        K = self.K
+
+        # estimate class prior parameters
         self.p_Y.fit(Y)
 
-        # estimate conditional parameters
-        for i in range(D):
-            self.p_X[i][0].fit(X[Y==0,i])
-            self.p_X[i][1].fit(X[Y==1,i])
+        # estimate class conditional parameters
+        for j in range(K):
+            for k in range(D):
+                self.p_X[j][k].fit(X[Y==j,k])
 
-    def predict_proba(self, X):
+    def class_prior_prob(self, Y=None):
         '''
-        Predict class posterior distribution.
+        Get class prior probabilities.
+
+        Args:
+            Y: K vector of class indices, or None
+                to return the full class distribution.
+        Returns:
+            p_Y: K vector of class prior probabilities,
+                where p_Y[j] = P(Y=y_j).
+        '''
+        if Y is None:
+            Y = np.arange(self.K)
+        return self.p_Y.predict(Y)
+
+    def class_conditional_prob(self, X=None, nan=np.nan):
+        '''
+        Get class conditional probabilities.
+
+        Args:
+            X: N x D matrix of attribute values, or None
+                to return the full conditional distribution.
+        Returns:
+            p_X_Y: N x K x D class conditional probabilities,
+                where p_X_Y[i,j,k] = p(X_k=x_ik|Y=j)
+        '''
+        if X is None:
+            X = []
+            M = max(len(p_X.support) for p_X in self.p_X[0])
+            for k, p_X in enumerate(self.p_X[0]):
+                X.append(np.arange(M).astype(float))
+                X[k][len(p_X.support):] = np.nan
+            X = np.stack(X, axis=1)
+
+        N, D = X.shape
+        assert D == self.D
+        K = self.K
+
+        p_X_Y = np.zeros((N, K, D))
+        for j in range(K):
+            for k in range(D):
+                p_X_Y[:,j,k] = self.p_X[j][k].predict(X[:,k])
+
+        # handle missing values
+        p_X_Y = np.where(np.isnan(p_X_Y), nan, p_X_Y)
+
+        return p_X_Y
+
+    def joint_prob(self, X, nan=np.nan):
+        '''
+        Get joint probability density.
 
         Args:
             X: N x D matrix of attribute values.
         Returns:
-            N x 2 matrix of class probabilities.
+            p_XY: N x K matrix of joint probabilities,
+                where p_XY[i,j] = p(X=x_i,Y=j)
         '''
-        N, D = X.shape
-        assert D == len(self.p_X)
+        p_Y = self.class_prior_prob()
+        p_X_Y = self.class_conditional_prob(X, nan=nan)
+        return np.prod(p_X_Y, axis=2) * p_Y[np.newaxis,:]
 
-        # class prior probabilities
-        #   p_Y0 = p(Y=0)
-        #   p_Y1 = p(Y=1)
+    def class_posterior_prob(self, X, nan=np.nan):
+        '''
+        Get class posterior distribution.
 
-        p_Y0 = self.p_Y.predict(np.zeros(N))
-        p_Y1 = self.p_Y.predict(np.ones(N))
-
-        # class conditional probabilities
-        #   p_X_Y0 = p_X[i][0] = p(X_i|Y=0)
-        #   p_X_Y1 = p_X[i][1] = p(X_i|Y=1)
-
-        p_X_Y0 = np.zeros((N, D))
-        p_X_Y1 = np.zeros((N, D))
-        for i in range(D):
-            p_X_Y0[:,i] = self.p_X[i][0].predict(X[:,i])
-            p_X_Y1[:,i] = self.p_X[i][1].predict(X[:,i])
-
-        # handle missing values by marginalization
-        p_X_Y0 = np.where(np.isnan(X), 1.0, p_X_Y0)
-        p_X_Y1 = np.where(np.isnan(X), 1.0, p_X_Y1)
-
-        # joint probabilities
-        #   p_XY0 = p(X,Y=0)
-        #   p_XY1 = p(X,Y=1)
-
-        p_XY0 = np.prod(p_X_Y0, axis=1) * p_Y0
-        p_XY1 = np.prod(p_X_Y1, axis=1) * p_Y1
-
-        # class posterior probabilities
-        #   p_Y0_X = p(Y=0|X) = p(X,Y=0) / sum_y p(X,Y=y)
-        #   p_Y1_X = p(Y=1|X) = p(X,Y=1) / sum_y p(X,Y=y)
-
-        p_Y0_X = p_XY0 / (p_XY0 + p_XY1)
-        p_Y1_X = p_XY1 / (p_XY0 + p_XY1)
-
-        return np.stack([p_Y0_X, p_Y1_X], axis=1)
+        Args:
+            X: N x D matrix of attribute values.
+        Returns:
+            p_Y_X: N x K matrix of class probabilities,
+                where p_Y_X[i,j] = p(Y=j|X=x_i)
+        '''
+        p_XY = self.joint_prob(X, nan=nan)
+        return p_XY / p_XY.sum(axis=1, keepdims=True)
 
     def predict(self, X):
         '''
@@ -291,8 +417,18 @@ class NaiveBayes(object):
         Args:
             X: N x D matrix of attribute values.
         Returns:
-            N vector of class predictions.
+            Yhat: N vector of class predictions.
         '''
-        # predict class as argmax of posterior
-        p_Y_X = self.predict_proba(X)
+        p_Y_X = self.class_posterior_prob(X)
         return np.argmax(p_Y_X, axis=1)
+
+    def log_likelihood(self, X):
+
+        # log P(X|θ)
+        # log ∏_i P(X_i|θ)
+        # ∑_i log P(X_i|θ)
+        # ∑_i log ∑_j P(X_i,Y=j|θ)
+
+        p_XY = self.joint_prob(X, nan=1.0)
+        p_X = p_XY.sum(axis=1)
+        return np.log(p_X).sum()

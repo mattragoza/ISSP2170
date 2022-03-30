@@ -12,31 +12,24 @@ model_file = 'model.pkl'
 print(f'Loading training set from {data_file}')
 
 data = pd.read_csv(data_file)
-print(data)
+data[data == 0] = np.nan
 print(data.describe().T)
 
-X = data.values
+X = data.values - 1
 print(X.shape)
 
 # model training
 
-print('\nFitting naive Bayes model')
+print('\nInitializing latent variable model')
 model = bayes.NaiveBayes(p_X=[5,3,3,4,5,4], p_Y=4)
 print(model)
 
-exit()
+print('\nFitting latent variable model')
 model.fit(X)
+print(model)
 
-print(f'\nSaving model to {model_file}')
+
+print(f'Saving model to {model_file}')
 
 with open(model_file, 'wb') as f:
 	pickle.dump(model, f)
-
-print('\nPredicting probabilities')
-
-phat = model.predict_proba(np.array([[1,0,1,0]]))
-print(phat)
-
-nan = np.nan
-phat = model.predict_proba(np.array([[1,nan,1,nan]]))
-print(phat)
