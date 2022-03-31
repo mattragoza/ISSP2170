@@ -410,6 +410,8 @@ class NaiveBayes(object):
         p_XY = self.joint_prob(X, nan=nan)
         return p_XY / p_XY.sum(axis=1, keepdims=True)
 
+
+
     def predict(self, X):
         '''
         Predict classes for given data.
@@ -422,13 +424,14 @@ class NaiveBayes(object):
         p_Y_X = self.class_posterior_prob(X)
         return np.argmax(p_Y_X, axis=1)
 
-    def log_likelihood(self, X):
+    def likelihood(self, X, nan=np.nan):
+        '''
+        Get data distribution.
 
-        # log P(X|θ)
-        # log ∏_i P(X_i|θ)
-        # ∑_i log P(X_i|θ)
-        # ∑_i log ∑_j P(X_i,Y=j|θ)
-
-        p_XY = self.joint_prob(X, nan=1.0)
-        p_X = p_XY.sum(axis=1)
-        return np.log(p_X).sum()
+        Args:
+            X: N x D matrix of attribute values.
+        Returns:
+            p_X: N vector of data probabilities.
+        '''
+        p_XY = self.joint_prob(X, nan=nan)
+        return p_XY.sum(axis=1)

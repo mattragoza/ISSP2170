@@ -33,3 +33,6 @@ print(f'Saving model to {model_file}')
 
 with open(model_file, 'wb') as f:
 	pickle.dump(model, f)
+
+
+print((X[:,5:] == np.arange(4)).sum(axis=0))
