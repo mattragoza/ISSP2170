@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
 
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 
 from classify import (
 	print_config, evaluate_classifier, plot_classifier, write_classifier
@@ -22,13 +22,14 @@ print('Configuring run')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--name', default=None)
+parser.add_argument('--n_trees', default=5, type=int)
 parser.add_argument('--option', default=1, type=int)
 parser.add_argument('--data_dir', default='.')
 parser.add_argument('--out_dir', default='.')
 args = parser.parse_args()
 
 if args.name is None:
-	args.name = f'DT{args.option}'
+	args.name = f'DT{args.option}-Grad{args.n_trees}'
 
 model_kws = [
 	dict(min_samples_leaf=5, max_depth=None),
@@ -60,11 +61,13 @@ print(X_test.shape, y_test.shape)
 
 # model training
 
-print('\nFitting decision tree classifier')
-model = DecisionTreeClassifier(**model_kws, random_state=0)
+print('\nFitting gradient boosting classifier')
+model = GradientBoostingClassifier(
+	**model_kws, n_estimators=args.n_trees, random_state=0
+)
 model.fit(X_train, y_train)
 
-print(f'Node count = {model.tree_.node_count}')
+#print(f'Node count = {model.tree_.node_count}')
 print(f'Train score = {model.score(X_train, y_train)}')
 print(f'Test score = {model.score(X_test, y_test)}')
 
